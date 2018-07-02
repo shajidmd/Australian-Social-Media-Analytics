@@ -1,0 +1,15 @@
+Automation:
+
+This folder contains Boto and Ansible scripts to deploy a scalable infrastructure on Nectar cloud based on an SSH key.
+
+The Boto scripts provision the VMs as well as volumes.
+
+The IPs of the infrastructure that's provisioned gets stored in hosts file.
+
+The ansible playbooks scripts which are called via the shell file "deployboto.sh" then provision various software on the VMs.
+
+Instructions to run:
+1)Go to Scripts folder.
+2)Run the following shell file with command:
+sh deployboto.sh
+

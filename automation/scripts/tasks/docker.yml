@@ -1,0 +1,67 @@
+---
+- name: docker
+  hosts: server
+  remote_user: ubuntu
+  become: yes
+
+  tasks:
+  - name: Get current kernel
+    shell: "uname -r"
+    ignore_errors: yes
+    register: current_kernel
+
+  - name: Uninstall old versions of docker
+    apt:
+      name: "{{ item }}"
+      state: absent
+    with_items:
+      - docker
+      - docker-engine
+      - docker.io
+
+  - name: Install dependencies
+    apt:
+      name: "{{ item }}"
+      state: latest
+      install_recommends: no
+      update_cache: yes
+    with_items:
+      - linux-image-extra-{{ current_kernel.stdout }}
+      - linux-image-extra-virtual
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+      - python-pip
+      - python-setuptools
+      - vim
+
+  - name: Add Docker repository key
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+
+      - name: Add Docker repository and update apt cache
+        apt_repository:
+          repo: "deb https://download.docker.com/linux/{{ ansible_distribution|lower }} {{ ansible_distribution_release }} stable"
+          mode: '644'
+          update_cache: yes
+          state: present
+
+  - name: Install docker
+    apt:
+      name: "{{ item }}"
+      state: latest
+      install_recommends: no
+      update_cache: yes
+    with_items:
+      - docker-ce
+
+
+  - name: Update pip and install docker-compose
+    pip:
+      name: "{{ item }}"
+      state: latest
+    with_items:
+      - pip
+      - docker-compose

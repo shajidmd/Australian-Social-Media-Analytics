@@ -1,0 +1,22 @@
+---
+- name: transfer files
+  hosts: server
+  remote_user: ubuntu
+  become: yes
+
+  tasks:
+    - command: mkdir /home/ubuntu/Harvester
+    - command: mkdir /home/ubuntu/CouchDB
+    - copy:
+        src: ../Harvester/
+        dest: /home/ubuntu/Harvester/
+        owner: ubuntu
+        group: ubuntu
+        directory_mode: yes
+        mode: "u=rwX,g=rX,o=rX"
+    - copy:
+        dest: /home/ubuntu/
+        owner: ubuntu
+        group: ubuntu
+        directory_mode: yes
+        mode: "u=rwX,g=rX,o=rX"

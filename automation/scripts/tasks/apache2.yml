@@ -1,0 +1,14 @@
+---
+- hosts: server
+  remote_user: ubuntu
+  sudo: yes
+
+  tasks:
+  - name: Install apache
+    apt:
+      name: "{{ item }}"
+      state: latest
+    with_items:
+      - apache2
+      - vim
+      - curl

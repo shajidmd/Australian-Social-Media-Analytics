@@ -1,0 +1,10 @@
+---
+- name: setup harvester
+  hosts: server
+  remote_user: ubuntu
+  become: yes
+
+  tasks:
+    - command: sh deployharvester.sh
+      args:
+       chdir: /home/ubuntu/

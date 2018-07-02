@@ -1,0 +1,127 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+import os
+import sys
+import couchdb
+import logging
+import time
+from twython import Twython
+from twython import TwythonError
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+sys.path.append('/usr/local/lib/python3.4/dist-packages')
+
+##Assigns sentiment scores to tweets
+##------------------------------------------------------------------
+def sentiment_analyzer(tweet_text):
+        analyzer=SentimentIntensityAnalyzer()
+        return analyzer.polarity_scores(tweet_text)
+
+
+##Tests whether the rate limit of the last request has been reached
+##------------------------------------------------------------------
+def test_rate_limit(api, wait=True, buffer=.1):
+
+        # Get the number of remaining requests
+        remaining = float(api.get_lastfunction_header(header='x-rate-limit-reset'))-time.time()
+        # Check if we have reached the limit
+        if remaining == 0:
+            limit = int(api.get_lastfunction_header(header='x-rate-limit-reset'))
+            reset = int(api.get_lastfunction_header(headerS='x-rate-limit-reset'))
+            # Parse the UTC time
+            reset = datetime.fromtimestamp(reset)
+            # Let the user know we have reached the rate limit
+            log.info("0 of %d requests remaining until %d.", limit, reset)
+
+            if wait:
+                # Determine the delay and sleep
+                delay = (reset - datetime.now()).total_seconds() + buffer
+                log.info("Sleeping for %d", delay)
+                sleep(delay)
+                # Rate limit reset. OK to proceed.
+                return True
+            else:
+                # Rate limit reached.
+                return False
+
+        # Rate limit not reached
+        return True
+
+
+##Couch dB connection
+##------------------------------------------------------------------
+user='admin'
+password='admin'
+couchserver = couchdb.Server("http://%s:%s@115.146.95.146:5984/" % (user,password))
+print(couchserver)
+
+dbname='sentiment_tweets'
+if dbname in couchserver:
+    db=couchserver[dbname]
+else:
+    db=couchserver.create(dbname)
+
+
+##Twitter search
+##------------------------------------------------------------------
+APP_KEY='EVVLDcQE0PLPXEbLjT372iexr'
+APP_SECRET='bXkkreP8eESqKsCt7BUd1SsBC19DRDEEIoQ7hBVXY6MvrYa8ZM'
+
+twitter = Twython(APP_KEY, APP_SECRET, oauth_version=2)
+ACCESS_TOKEN = twitter.obtain_access_token()
+twitter = Twython(APP_KEY, access_token=ACCESS_TOKEN)
+
+##Bag of positive and negative words
+POS_WORDS_FILE = os.path.join('positive-words.txt')
+NEG_WORDS_FILE = os.path.join('negative-words.txt')
+
+pos_words = []
+neg_words = []
+
+for pos_word in open(POS_WORDS_FILE, 'r').readlines()[35:]:
+    pos_words.append(pos_word.rstrip())
+
+for neg_word in open(NEG_WORDS_FILE, 'r').readlines()[35:]:
+    neg_words.append(neg_word.rstrip())
+
+keywords=pos_words+neg_words
+MAX_COUNT=100
+GEO_CODE2='-21.224565151719595,143.08818208387368,734.484km'
+
+##Fetching tweets
+loop=True
+while loop:
+    for keyword in keywords:
+        try:
+            t=twitter.search(q=keyword,count=MAX_COUNT, lang='en', geocode=GEO_CODE2)
+            tweet_object=t['statuses']
+            for tweet in tweet_object:
+                if len(tweet)>0:
+                    tweet['sentiment']=sentiment_analyzer(tweet['text'])
+                    tweet['keyword']=keyword
+                    tw_id=tweet['id_str']
+                    if tw_id in db:
+                        print('Duplicate tweet')
+                    else:
+                        db[tw_id] = tweet
+                        print('Written to database')
+                else:
+                    break
+
+        except:
+            print("Twython error")
+            remainder = float(twitter.get_lastfunction_header(header='x-rate-limit-reset')) - time.time()
+            loop=False
+           # twitter.disconnect()
+            time.sleep(remainder)
+           # twitter = Twython(APP_KEY, APP_SECRET,OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
+            twitter = Twython(APP_KEY, APP_SECRET, oauth_version=2)
+            ACCESS_TOKEN = twitter.obtain_access_token()
+            twitter = Twython(APP_KEY, access_token=ACCESS_TOKEN)
+            loop=True
+            continue
+       # except TwythonError as inst:
+       #     logger.error(inst.msg)
+       #     loop=test_rate_limit(twitter)
+       #     twitter = Twython(APP_KEY, APP_SECRET,OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
+       #     continue
+
